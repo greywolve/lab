@@ -13,25 +13,25 @@
   :plugins [[lein-cljsbuild "1.1.0"]
             [lein-figwheel "0.4.1"]]
 
-  :clean-targets ^{:protect false} ["resources/public/assets/js/compiled"
+  :clean-targets ^{:protect false} ["resources/public/lab/js/compiled"
                                     "target"]
   :source-paths ["src"]
 
   :cljsbuild {
-              :builds [{:id "devcards"
+              :builds [{:id "dev"
                         :source-paths ["src"]
                         :figwheel { :devcards true }
                         :compiler { :main       "lab.core"
-                                    :asset-path "js/compiled/devcards_out"
-                                    :output-to  "resources/public/assets/js/compiled/lab.js"
-                                    :output-dir "resources/public/assets/js/compiled/devcards_out"
+                                    :asset-path "js/compiled/lab_out"
+                                    :output-to  "resources/public/lab/js/compiled/lab.js"
+                                    :output-dir "resources/public/lab/js/compiled/lab_out"
                                     :source-map-timestamp true }}
                        {:id "prod"
                         :source-paths ["src"]
                         :compiler {:main       "lab.core"
                                    :devcards true
-                                   :asset-path "js/compiled/out"
-                                   :output-to  "resources/public/assets/js/compiled/lab.js"
+                                   :asset-path "js/compiled/lab_out"
+                                   :output-to  "resources/public/lab/js/compiled/lab.js"
                                    :optimizations :advanced}}]}
 
   :figwheel { :css-dirs ["resources/public/assets/css"] })
