@@ -1,1 +1,13 @@
 /* lab CSS */
+
+td, th {
+  padding: 0.5rem;
+}
+
+td:first-child {  
+  background-color: lightblue;
+}
+
+td:nth-child(2) {  
+  background-color: lightgrey;
+}

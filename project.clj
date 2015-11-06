@@ -34,4 +34,4 @@
                                    :output-to  "resources/public/lab/js/compiled/lab.js"
                                    :optimizations :advanced}}]}
 
-  :figwheel { :css-dirs ["resources/public/assets/css"] })
+  :figwheel { :css-dirs ["resources/public/lab/css"] })
