@@ -8,7 +8,8 @@
                  [devcards "0.2.0-8"]
                  [sablono "0.3.6"]
                  [org.omcljs/om "0.9.0"]
-                 [reagent "0.5.1"]]
+                 [reagent "0.5.1"]
+                 [rum "0.5.0"]]
 
   :plugins [[lein-cljsbuild "1.1.0"]
             [lein-figwheel "0.4.1"]]

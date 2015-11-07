@@ -1,19 +1,25 @@
 (ns lab.todomvc
   (:require
+   [clojure.string :as string]
    [devcards.core :as dc]
    [om.core :as om :include-macros true]
-   [sablono.core :as sab :include-macros true])
+   [sablono.core :as sab :include-macros true]
+   [rum.core :as rum])
   (:require-macros
    [devcards.core :refer [defcard defcard-doc deftest]]))
+
+(defn pass-in-atom-value [component args]
+  (fn [data owner]
+    (apply component (concat [@data] args))))
 
 (defn table
   [rows]
   (sab/html
-   [:table
-    (for [row rows]
-      [:tr
-       (for [col row]
-         [:td col])])]))
+   (into [:table]
+          (for [row rows]
+            (into [:tr {:key row}]
+                   (for [col row]
+                     [:td {:key col} col]))))))
 
 (defcard
   "# Todo MVC
@@ -24,33 +30,69 @@
   "## todo-item")
 
 (defcard
-  " states"
-  (sab/html [:ul.todo-list
-             [:li.completed
-              [:div.view
-               [:input.toggle {:type "checkbox" :checked "checked"}]
-               [:label "Become Batman"]
-               [:button {:class "button destroy"}]]
-              [:input.edit  {:value ""}]]
-             [:li
-              [:div.view
-               [:input.toggle {:type "checkbox"}]
-               [:label "Learn the one arm handstand"]
-               [:button {:class "button destroy"}]]
-              [:input.edit  {:value ""}]]]))
-
-(defcard
-  "entity"
   (table [["id" "number"]
           ["text" "string"]
-          ["editing?" "boolean"]
-          ["completed?" "boolean"]]))
+          ["state" "keyword (active|editing|completed)"]]))
 
-(defcard
-  "example entity instance"
-  '{:todo/id 1
-    :todo/text "Become Batman"
-    :todo/completed? true})
+(rum/defc todo-item < rum/static
+  [{:keys [todo-item/id todo-item/text todo-item/state]}]
+  [:li {:key id
+        :class (if (= state :active)
+                   ""
+                   (name state))}
+   [:div.view
+    [:input.toggle (cond-> {:type "checkbox"}
+                     (= state :completed) (assoc :checked "checked"))]
+    [:label text]
+    [:button {:class "button destroy"}]]
+   [:input.edit  {:value text}]])
+
+(rum/defc todo-item-wrapper < rum/static [todo]
+  [:section.todapp
+   [:section.main
+    [:ul.todo-list
+     (todo-item todo)]]
+   [:footer.footer]])
+
+(defcard todo-item-completed
+  (pass-in-atom-value todo-item-wrapper [])
+  {:todo-item/id 1
+   :todo-item/text "Become Batman."
+   :todo-item/state :completed}
+  {:inspect-data true})
+
+(defcard todo-item-editing
+  (pass-in-atom-value todo-item-wrapper [])
+  {:todo-item/id 1
+   :todo-item/text "Learn the one arm handstand."
+   :todo-item/state :editing}
+  {:inspect-data true})
+
+(defcard todo-item-active
+  (pass-in-atom-value todo-item-wrapper [])
+  {:todo-item/id 1
+   :todo-item/text "Do a backflip!"
+   :todo-item/state :active}
+  {:inspect-data true})
+
+(defn keep-todo? [filter-type {:keys [todo-item/state]}]
+  (case filter-type
+    :completed
+    (= state :completed)
+    :active
+    (= state :active)
+    true))
+
+(rum/defc todo-list < rum/static [{:keys [todo-list/id todo-list/show todo-list/todos]}]
+  [:ul.todo-list
+   (for [todo (filter (partial keep-todo? show) todos)]
+     (todo-item todo))])
+
+(rum/defc todo-list-wrapper < rum/static [data]
+  [:section.todapp
+   [:section.main
+    (todo-list data)]
+   [:footer.footer]])
 
 (defcard
   "## todo-item-list
@@ -59,134 +101,287 @@
    all todo-items.")
 
 (defcard
-  "entity"
   (table [["id" "number"]
           ["show" "keyword (all|completed|active)"]
           ["todos" "[todo-item ...]"]]))
 
+
+(def sentences
+  ["A theory wets the carriage with a burned consumer."
+   "The grateful tool thanks the genetics after the oldest northern."
+   "Its substance stirs against the witch!"
+   "Why does the leather hum?"
+   "After the offensive culprit chooses a brief variance."
+   "The shock venture calculates the jargon before the null buffer."
+   "Become Batman."
+   "Learn the one arm handstand."
+   "Do a backflip!"])
+
+(defn random-todo-item [id]
+  {:todo-item/id id
+   :todo-item/text (rand-nth sentences)
+   :todo-item/state (rand-nth [:completed :active])})
+
+(defn random-todo-items [n]
+  (let [r (range n)
+        todos (->> r
+                   (map random-todo-item)
+                   (into []))]
+    (assoc-in todos [(rand-nth r) :todo-item/state] :editing)))
+
+(defn no-todos-with-state [state todos]
+  (->> todos
+       (filter #(= (:todo-item/state %) state))
+       count))
+
+(defn todo-counts [todos]
+  {:active (no-todos-with-state :active todos)
+   :completed (no-todos-with-state :completed todos)
+   :editing (no-todos-with-state :editing todos)})
+
+(def todo-list-data
+  (let [todos (random-todo-items 10)]
+    (-> {:todo-list/id 1
+         :todo-list/show :all
+         :todo-list/todos todos}
+        (assoc :todo-counts (todo-counts todos)))))
+
 (defcard
-  "example entity instance"
-  '{:todo-list/id 1
-    :todo-list/show :all
-    :todo-list/todos [{:todo/id 1
-                       :todo/text "Become Batman"
-                       :todo/completed? true}]})
+  "shared data"
+  todo-list-data)
+
+(defcard todo-list-active
+  (pass-in-atom-value todo-list-wrapper [])
+  (assoc todo-list-data :todo-list/show :active))
+
+(defcard todo-list-completed
+  (pass-in-atom-value todo-list-wrapper [])
+  (assoc todo-list-data :todo-list/show :completed))
+
+(defcard todo-list-all
+  (pass-in-atom-value todo-list-wrapper [])
+  (assoc todo-list-data :todo-list/show :all))
+
+(rum/defc new-todo < rum/static [{:keys [new-todo/text]}]
+  [:input.new-todo {:placeholder "What needs to be done?"
+                    :autofocus true
+                    :value text}])
 
 (defcard
   "## new-todo")
 
 (defcard
-  "state"
-  (sab/html [:input.new-todo {:placeholder "What needs to be done?" :autofocus true}]))
-
-(defcard
-  "entity"
   (table [["id" "number"]
           ["text" "string"]]))
 
-(defcard
-  "example entity instance"
-  '{:new-todo/id 1
-    :new-todo/text ""})
+(defcard new-todo-blank
+  (pass-in-atom-value new-todo [])
+  {:new-todo/id 1
+   :new-todo/text ""}
+  {:inspect-data true})
+
+(defcard new-todo-really-long*
+  (pass-in-atom-value new-todo [])
+  {:new-todo/id 1
+   :new-todo/text
+   "This is going to be a really long todo entry, it's going to span quite a few words."}
+  {:inspect-data true})
+
+(rum/defc toggle-all-button < rum/static [{:keys [toggle-all-button/all-todos-completed?]}]
+  [:div
+   [:input.toggle-all (cond-> {:type "checkbox"}
+                        all-todos-completed? (assoc :checked "checked"))]
+   [:label {:for "toggle-all"} "Mark all complete"]])
+
+(rum/defc toggle-all-button-wrapper < rum/static [data]
+  [:div.todoapp
+   [:div.main
+    (toggle-all-button data)]])
 
 (defcard
   "## toggle-all-button")
 
 (defcard
-  "state"
-  (sab/html [:div.todoapp
-             [:div.main
-              [:input.toggle-all {:type "checkbox"}]
-              [:label {:for "toggle-all"} "Mark all complete"]]]))
-
-(defcard
-  "entity"
   (table [["id" "number"]
           ["all-todos-completed?" "boolean"]]))
 
-(defcard
-  "example entity instance"
-  '{:toggle-all-button/id 1
-    :toggle-all-button/all-todos-completed? false})
+(defcard toggle-all-button-off
+  (pass-in-atom-value toggle-all-button-wrapper [])
+  {:toggle-all-button/id 1
+   :toggle-all-button/all-todos-completed? false}
+  {:inspect-data true})
+
+(defcard toggle-all-button-on
+  (pass-in-atom-value toggle-all-button-wrapper [])
+  {:toggle-all-button/id 1
+   :toggle-all-button/all-todos-completed? true}
+  {:inspect-data true})
+
+
+(rum/defc filter-item < rum/static [{:keys [filter-item/label filter-item/url filter-item/selected?]}]
+  [:li [:a {:href url
+            :class (when selected? "selected")} (-> label name string/capitalize)]])
+
+(rum/defc filter-item-wrapper < rum/static [data]
+  [:div.footer
+   [:ul.filters
+    (filter-item data)]])
 
 (defcard
-  "## todo-filter-item")
+  "## filter-item")
 
 (defcard
-  "state"
-  (sab/html [:div.footer
-             [:ul.filters
-              [:li [:a.selected {:href "#!/lab.todomvc"} "All"]]
-              [:li [:a {:href "#!/lab.todomvc"} "Active"]]
-              [:li [:a {:href "#!/lab.todomvc"} "Completed"]]]]))
-(defcard
-  "entity"
   (table [["id" "number"]
-          ["name" "keyword"]
+          ["url" "string"]
+          ["label" "keyword"]
           ["selected?" "boolean"]]))
-(defcard
-  "example entity instance"
-  '{:filter-item/id 1
-    :filter-item/name :all
-    :filter-item/selected? true})
+
+(defcard filter-item-all
+  (pass-in-atom-value filter-item-wrapper [])
+  {:filter-item/id 1
+   :filter-item/url "#!/all"
+   :filter-item/label :all
+   :filter-item/selected? false}
+  {:inspect-data true})
+
+(defcard filter-item-all-not-selected
+  (pass-in-atom-value filter-item-wrapper [])
+  {:filter-item/id 1
+   :filter-item/url "#!/all"
+   :filter-item/label :all
+   :filter-item/selected? false}
+  {:inspect-data true})
+
+(defcard filter-item-active
+  (pass-in-atom-value filter-item-wrapper [])
+  {:filter-item/id 1
+   :filter-item/url "#!/active"
+   :filter-item/label :active
+   :filter-item/selected? true}
+  {:inspect-data true})
+
+(defcard filter-item-completed
+  (pass-in-atom-value filter-item-wrapper [])
+  {:filter-item/id 1
+   :filter-item/url "#!/completed"
+   :filter-item/label :completed
+   :filter-item/selected? true}
+  {:inspect-data true})
+
+(rum/defc filter-item-list < rum/static [{:keys [filter-item-list/filters]}]
+  [:ul.filters
+   (for [filter filters]
+     (filter-item filter))])
+
+(rum/defc filter-item-list-wrapper < rum/static [data]
+  [:div.footer
+   (filter-item-list data)])
 
 (defcard
   "## todo-filter-item-list
   This doesn't actually need to hold any special state, since its merely a container for filter-items.")
 
 (defcard
-  "entity"
   (table [["id" "number"]
           ["filters" "[filter-item ...]"]]))
 
-(defcard
-  "example entity instance"
-  '{:filter-item-list/id 1
-    :filter-item-list/filters [{:filter-item/id 1
-                                :filter-item/name :all
-                                :filter-item/selected? true}
-                               {:filter-item/id 2
-                                :filter-item/name :active
-                                :filter-item/selected? false}
-                               {:filter-item/id 3
-                                :filter-item/name :completed
-                                :filter-item/selected? false}]})
+(def filter-item-list-data
+  {:filter-item-list/id 1
+   :filter-item-list/filters [{:filter-item/id 1
+                               :filter-item/label :all
+                               :filter-item/selected? true}
+                              {:filter-item/id 2
+                               :filter-item/label :active
+                               :filter-item/selected? false}
+                              {:filter-item/id 3
+                               :filter-item/label :completed
+                               :filter-item/selected? false}]})
+
+(defcard filter-item-list-all-selected
+  (pass-in-atom-value filter-item-list-wrapper [])
+  filter-item-list-data
+  {:inspect-data true})
+
+
+(defcard filter-item-list-active-selected
+  (pass-in-atom-value filter-item-list-wrapper [])
+  (-> filter-item-list-data
+      (assoc-in [:filter-item-list/filters 0 :filter-item/selected?] false)
+      (assoc-in [:filter-item-list/filters 1 :filter-item/selected?] true))
+  {:inspect-data true})
+
+(defcard filter-item-list-completed-selected
+  (pass-in-atom-value filter-item-list-wrapper [])
+  (-> filter-item-list-data
+      (assoc-in [:filter-item-list/filters 0 :filter-item/selected?] false)
+      (assoc-in [:filter-item-list/filters 2 :filter-item/selected?] true))
+  {:inspect-data true})
+
+
+(defn pluralize-items-left [n]
+  (case n
+    0 "No items left"
+    1 " item left"
+    " items left"))
+
+(rum/defc items-left-counter < rum/static [{:keys [items-left-counter/todos-left]}]
+  [:span.todo-count
+   (when (> todos-left 0) [:strong todos-left]) (pluralize-items-left todos-left)])
+
+(rum/defc items-left-counter-wrapper < rum/static [data]
+  [:section.footer
+   (items-left-counter data)])
 
 (defcard
   "## items-left-counter
   Requires proper pluralisation.")
 
 (defcard
-  (sab/html [:section.footer
-             [:span.todo-count [:strong 1] " item left"]]))
-(defcard
-  (sab/html [:section.footer
-             [:span.todo-count [:strong 2] " items left"]]))
-(defcard
-  (sab/html [:section.footer
-             [:span.todo-count "No items left"]]))
-(defcard
-  "entity"
   (table [["id" "number"]
           ["todos-left" "number"]]))
-(defcard
-  "example entity instance"
-  '{:items-left-counter/id 1
-    :items-left-counter/todos-left 2})
+
+(defcard items-left-counter-for-2-items
+  (pass-in-atom-value items-left-counter-wrapper [])
+  {:items-left-counter/id 1
+   :items-left-counter/todos-left 2}
+  {:inspect-data true})
+
+(defcard items-left-counter-for-1-item
+  (pass-in-atom-value items-left-counter-wrapper [])
+  {:items-left-counter/id 1
+   :items-left-counter/todos-left 1}
+  {:inspect-data true})
+
+(defcard items-left-counter-for-no-items
+  (pass-in-atom-value items-left-counter-wrapper [])
+  {:items-left-counter/id 1
+   :items-left-counter/todos-left 0}
+  {:inspect-data true})
+
+(rum/defc clear-completed-button < rum/static
+  [{:keys [clear-completed-button/completed-todos-exist?]}]
+  (when completed-todos-exist?
+    [:button.button {:class "clear-completed"} "Clear completed"]))
+
+(rum/defc clear-completed-button-wrapper < rum/static [data]
+  [:section.footer
+   (clear-completed-button data)])
 
 (defcard
   "## clear-completed-button ")
 
 (defcard
-  (sab/html [:section.footer
-             [:button.button {:class "clear-completed"} "Clear completed"]]))
-
-(defcard
-  "entity"
   (table [["id" "number"]
           ["completed-todos-exist?" "boolean"]]))
 
-(defcard
-  "example entity instance"
-  '{:clear-completed-button/id 1
-    :clear-completed-button/completed-todos-exist? true})
+(defcard clear-completed-button-showing
+  (pass-in-atom-value clear-completed-button-wrapper [])
+  {:clear-completed-button/id 1
+   :clear-completed-button/completed-todos-exist? true}
+  {:inspect-data true})
+
+(defcard clear-completed-button-hidden
+  (pass-in-atom-value clear-completed-button-wrapper [])
+  {:clear-completed-button/id 1
+   :clear-completed-button/completed-todos-exist? false}
+  {:inspect-data true})
