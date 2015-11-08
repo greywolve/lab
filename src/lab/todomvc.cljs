@@ -180,7 +180,7 @@
    :new-todo/text ""}
   {:inspect-data true})
 
-(defcard new-todo-really-long*
+(defcard new-todo-really-long
   (pass-in-atom-value new-todo [])
   {:new-todo/id 1
    :new-todo/text
@@ -194,8 +194,8 @@
    [:label {:for "toggle-all"} "Mark all complete"]])
 
 (rum/defc toggle-all-button-wrapper < rum/static [data]
-  [:div.todoapp
-   [:div.main
+  [:section.todoapp
+   [:section.main
     (toggle-all-button data)]])
 
 (defcard
@@ -223,9 +223,10 @@
             :class (when selected? "selected")} (-> label name string/capitalize)]])
 
 (rum/defc filter-item-wrapper < rum/static [data]
-  [:div.footer
-   [:ul.filters
-    (filter-item data)]])
+  [:section.todoapp
+   [:section.footer
+    [:ul.filters
+     (filter-item data)]]])
 
 (defcard
   "## filter-item")
@@ -241,7 +242,7 @@
   {:filter-item/id 1
    :filter-item/url "#!/all"
    :filter-item/label :all
-   :filter-item/selected? false}
+   :filter-item/selected? true}
   {:inspect-data true})
 
 (defcard filter-item-all-not-selected
@@ -274,8 +275,9 @@
      (filter-item filter))])
 
 (rum/defc filter-item-list-wrapper < rum/static [data]
-  [:div.footer
-   (filter-item-list data)])
+  [:section.todapp
+   [:section.footer
+    (filter-item-list data)]])
 
 (defcard
   "## todo-filter-item-list
@@ -297,26 +299,39 @@
                                :filter-item/label :completed
                                :filter-item/selected? false}]})
 
+;; styles seem to get messed up for filter-item-lists on mobile with inspect-data true
+;; hence the extra cards to show the state
 (defcard filter-item-list-all-selected
   (pass-in-atom-value filter-item-list-wrapper [])
-  filter-item-list-data
-  {:inspect-data true})
+  filter-item-list-data)
 
+(defcard
+  ""
+  filter-item-list-data)
 
 (defcard filter-item-list-active-selected
   (pass-in-atom-value filter-item-list-wrapper [])
   (-> filter-item-list-data
       (assoc-in [:filter-item-list/filters 0 :filter-item/selected?] false)
-      (assoc-in [:filter-item-list/filters 1 :filter-item/selected?] true))
-  {:inspect-data true})
+      (assoc-in [:filter-item-list/filters 1 :filter-item/selected?] true)))
+
+(defcard
+  ""
+  (-> filter-item-list-data
+      (assoc-in [:filter-item-list/filters 0 :filter-item/selected?] false)
+      (assoc-in [:filter-item-list/filters 1 :filter-item/selected?] true)))
 
 (defcard filter-item-list-completed-selected
   (pass-in-atom-value filter-item-list-wrapper [])
   (-> filter-item-list-data
       (assoc-in [:filter-item-list/filters 0 :filter-item/selected?] false)
-      (assoc-in [:filter-item-list/filters 2 :filter-item/selected?] true))
-  {:inspect-data true})
+      (assoc-in [:filter-item-list/filters 2 :filter-item/selected?] true)))
 
+(defcard
+  ""
+  (-> filter-item-list-data
+      (assoc-in [:filter-item-list/filters 0 :filter-item/selected?] false)
+      (assoc-in [:filter-item-list/filters 2 :filter-item/selected?] true)))
 
 (defn pluralize-items-left [n]
   (case n
@@ -329,8 +344,9 @@
    (when (> todos-left 0) [:strong todos-left]) (pluralize-items-left todos-left)])
 
 (rum/defc items-left-counter-wrapper < rum/static [data]
-  [:section.footer
-   (items-left-counter data)])
+  [:section.todapp
+   [:section.footer
+    (items-left-counter data)]])
 
 (defcard
   "## items-left-counter
@@ -364,8 +380,9 @@
     [:button.button {:class "clear-completed"} "Clear completed"]))
 
 (rum/defc clear-completed-button-wrapper < rum/static [data]
-  [:section.footer
-   (clear-completed-button data)])
+  [:section.todapp
+   [:section.footer
+    (clear-completed-button data)]])
 
 (defcard
   "## clear-completed-button ")
